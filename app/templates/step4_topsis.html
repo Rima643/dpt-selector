@@ -1,0 +1,303 @@
+{% extends "base.html" %}
+{% block title %}Шаг 4 — TOPSIS{% endblock %}
+{% block content %}
+<h2 class="mb-4">
+    <span class="step-badge me-2">4</span> Шаг 4 — Метод TOPSIS
+</h2>
+
+<div class="row g-4">
+<div class="col-md-4">
+    <div class="card">
+        <div class="card-header">Финалисты и настройка</div>
+        <div class="card-body">
+            <div class="mb-3">
+                <label class="form-label">Идеальное и антиидеальное решение</label>
+                <select class="form-select" id="idealMode">
+                    <option value="auto">Автоматически из данных</option>
+                    <option value="manual">Задать вручную</option>
+                </select>
+            </div>
+            <div id="manualIdeal" class="d-none">
+                <p style="color:var(--muted);font-size:0.8rem">
+                    Введите A* (идеальное) и A- (антиидеальное) по каждому критерию
+                </p>
+                <div id="idealInputs"></div>
+            </div>
+            <div class="mb-3">
+                <label class="form-label">Финалисты (выберите из лидеров МАИ)</label>
+                <div id="finalistSelector"></div>
+            </div>
+            <button class="btn btn-primary w-100" onclick="runTOPSIS()">
+                Запустить TOPSIS
+            </button>
+        </div>
+    </div>
+</div>
+
+<div class="col-md-8">
+    <div id="topsisResults" class="d-none">
+        <div class="card mb-4">
+            <div class="card-header">Итоговое ранжирование</div>
+            <div class="card-body">
+                <div class="table-responsive">
+                    <table class="table" id="rankingTable">
+                        <thead>
+                            <tr>
+                                <th>Ранг</th><th>Код</th><th>Двигатель</th>
+                                <th>Мощность</th><th>S*</th><th>S-</th><th>C*</th>
+                            </tr>
+                        </thead>
+                        <tbody id="rankingBody"></tbody>
+                    </table>
+                </div>
+                <div id="winnerBanner"></div>
+            </div>
+        </div>
+
+        <div class="card mb-4">
+            <div class="card-header">Пошаговые вычисления TOPSIS</div>
+            <div class="card-body">
+                <ul class="nav nav-tabs mb-3">
+                    <li class="nav-item">
+                        <button class="nav-link active" data-ttab="decision"
+                            onclick="showTTab('decision')">1. Матрица решений</button>
+                    </li>
+                    <li class="nav-item">
+                        <button class="nav-link" data-ttab="norm"
+                            onclick="showTTab('norm')">2. Нормировка</button>
+                    </li>
+                    <li class="nav-item">
+                        <button class="nav-link" data-ttab="weighted"
+                            onclick="showTTab('weighted')">3. Взвешенная</button>
+                    </li>
+                    <li class="nav-item">
+                        <button class="nav-link" data-ttab="ideal"
+                            onclick="showTTab('ideal')">4. A* и A-</button>
+                    </li>
+                    <li class="nav-item">
+                        <button class="nav-link" data-ttab="distances"
+                            onclick="showTTab('distances')">5. Расстояния</button>
+                    </li>
+                </ul>
+                <div id="tStepContent"></div>
+            </div>
+        </div>
+
+        <div class="d-flex justify-content-between">
+            <a href="/step3" class="btn btn-outline-secondary">Назад</a>
+            <button class="btn btn-success" onclick="exportReport()">
+                Скачать отчёт Excel
+            </button>
+        </div>
+    </div>
+</div>
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script>
+let topsisData = null;
+let ahpData = JSON.parse(localStorage.getItem('ahpData') || '{}');
+let finalistIds = JSON.parse(localStorage.getItem('finalistIds') || '[]');
+let selectedIds = JSON.parse(localStorage.getItem('selectedMotorIds') || '[]');
+
+const CRITERIA = [
+    {key:'k1_power',  label:'K1 Мощность, кВт', dir:'max'},
+    {key:'k2_eff',    label:'K2 КПД, %',         dir:'max'},
+    {key:'k3_torque', label:'K3 Момент, Нм',     dir:'max'},
+    {key:'k4_current',label:'K4 Ток, А',          dir:'min'},
+    {key:'k5_mass',   label:'K5 Масса, кг',       dir:'min'},
+    {key:'k10_price', label:'K10 Цена, т.р.',     dir:'min'},
+];
+
+document.getElementById('idealMode').onchange = function() {
+    const manual = this.value === 'manual';
+    document.getElementById('manualIdeal').classList.toggle('d-none', !manual);
+    if (manual) renderIdealInputs();
+};
+
+function renderIdealInputs() {
+    let html = '<div class="row g-2">';
+    CRITERIA.forEach(c => {
+        html += `<div class="col-12" style="font-size:0.8rem">
+            <strong>${c.label}</strong> (${c.dir})
+            <div class="row g-1 mt-1">
+                <div class="col-6">
+                    <label class="form-label" style="font-size:0.75rem">A* (идеальное)</label>
+                    <input type="number" class="form-control form-control-sm"
+                           id="best_${c.key}" step="any">
+                </div>
+                <div class="col-6">
+                    <label class="form-label" style="font-size:0.75rem">A- (антиидеальное)</label>
+                    <input type="number" class="form-control form-control-sm"
+                           id="worst_${c.key}" step="any">
+                </div>
+            </div>
+        </div>`;
+    });
+    html += '</div>';
+    document.getElementById('idealInputs').innerHTML = html;
+}
+
+function initFinalists() {
+    const ranking = ahpData.ranking || [];
+    let html = '';
+    ranking.forEach(r => {
+        const checked = finalistIds.includes(r.id);
+        html += `<div class="form-check">
+            <input class="form-check-input" type="checkbox" id="fin-${r.id}"
+                value="${r.id}" ${checked ? 'checked' : ''}>
+            <label class="form-check-label" for="fin-${r.id}" style="font-size:0.85rem">
+                ${r.code} — ${r.name} (Zi=${r.Zi})
+            </label>
+        </div>`;
+    });
+    document.getElementById('finalistSelector').innerHTML = html ||
+        '<p style="color:var(--muted);font-size:0.85rem">Сначала выполните МАИ (шаг 3)</p>';
+}
+
+async function runTOPSIS() {
+    const checked = [...document.querySelectorAll('.form-check-input:checked')]
+                        .map(cb => parseInt(cb.value));
+    if (checked.length < 2) { alert('Выберите минимум 2 финалиста'); return; }
+
+    const mode = document.getElementById('idealMode').value;
+    let idealBest  = null;
+    let idealWorst = null;
+
+    if (mode === 'manual') {
+        idealBest  = CRITERIA.map(c => parseFloat(document.getElementById(`best_${c.key}`).value) || 0);
+        idealWorst = CRITERIA.map(c => parseFloat(document.getElementById(`worst_${c.key}`).value) || 0);
+    }
+
+    const btn = document.querySelector('button[onclick="runTOPSIS()"]');
+    btn.textContent = 'Вычисление...';
+    btn.disabled = true;
+
+    const resp = await fetch('/api/analysis/topsis', {
+        method: 'POST',
+        headers: {'Content-Type': 'application/json'},
+        body: JSON.stringify({
+            motor_ids: checked,
+            ideal_best:  idealBest,
+            ideal_worst: idealWorst
+        })
+    });
+    topsisData = await resp.json();
+
+    btn.textContent = 'Запустить TOPSIS';
+    btn.disabled = false;
+    document.getElementById('topsisResults').classList.remove('d-none');
+
+    renderRanking();
+    showTTab('decision');
+}
+
+function renderRanking() {
+    const body = document.getElementById('rankingBody');
+    body.innerHTML = topsisData.ranking.map(r => `
+    <tr class="${r.rank === 1 ? 'winner-row' : ''}">
+        <td>${r.rank === 1 ? '#1' : r.rank}</td>
+        <td><span class="badge bg-secondary">${r.code}</span></td>
+        <td>${r.name}</td>
+        <td>${r.power} кВт</td>
+        <td>${r.S_star}</td>
+        <td>${r.S_neg}</td>
+        <td><strong>${r.C_star}</strong></td>
+    </tr>`).join('');
+
+    document.getElementById('winnerBanner').innerHTML = `
+    <div class="alert alert-success mt-3 text-center" style="font-size:1.05rem">
+        Рекомендуемый двигатель:
+        <strong>${topsisData.winner.code} — ${topsisData.winner.name}</strong><br>
+        C* = ${topsisData.winner.C_star} | Мощность: ${topsisData.winner.power} кВт
+    </div>`;
+}
+
+function showTTab(tab) {
+    document.querySelectorAll('[data-ttab]').forEach(b => {
+        b.classList.toggle('active', b.dataset.ttab === tab);
+    });
+    const s = topsisData.steps;
+    const codes = s.motor_codes;
+    let html = '';
+
+    if (tab === 'decision') {
+        html = '<p style="color:var(--muted);font-size:0.8rem">Исходная матрица решений U</p>';
+        html += buildTTable(s.criteria_labels, codes, s.decision_matrix, 4);
+    } else if (tab === 'norm') {
+        html = '<p style="color:var(--muted);font-size:0.8rem">Нормированная матрица R = U / sqrt(sum U^2)</p>';
+        html += `<p style="color:var(--muted);font-size:0.75rem">Нормы: ${s.col_norms.join(' | ')}</p>`;
+        html += buildTTable(s.criteria_labels, codes, s.normalized_matrix, 6);
+    } else if (tab === 'weighted') {
+        html = '<p style="color:var(--muted);font-size:0.8rem">Взвешенная матрица V = R * w</p>';
+        html += `<p style="color:var(--muted);font-size:0.75rem">Веса: ${s.weights.join(' | ')}</p>`;
+        html += buildTTable(s.criteria_labels, codes, s.weighted_matrix, 6);
+    } else if (tab === 'ideal') {
+        html = '<div class="row g-3"><div class="col-6">';
+        html += '<p style="color:var(--green);font-size:0.85rem"><strong>A* (идеальное)</strong></p>';
+        html += '<table class="table table-sm" style="font-size:0.8rem"><tbody>';
+        s.criteria_labels.forEach((l, i) => {
+            html += `<tr><td style="color:var(--muted)">${l}</td><td>${s.A_star[i]}</td></tr>`;
+        });
+        html += '</tbody></table></div><div class="col-6">';
+        html += '<p style="color:#f7614f;font-size:0.85rem"><strong>A- (антиидеальное)</strong></p>';
+        html += '<table class="table table-sm" style="font-size:0.8rem"><tbody>';
+        s.criteria_labels.forEach((l, i) => {
+            html += `<tr><td style="color:var(--muted)">${l}</td><td>${s.A_neg[i]}</td></tr>`;
+        });
+        html += '</tbody></table></div></div>';
+    } else if (tab === 'distances') {
+        html = '<div class="table-responsive"><table class="table table-sm" style="font-size:0.8rem">';
+        html += '<thead><tr><th>Двигатель</th><th>S* (до идеала)</th><th>S- (до антиидеала)</th><th>C*</th></tr></thead><tbody>';
+        codes.forEach((code, i) => {
+            html += `<tr><td>${code}</td><td>${s.S_star_list[i]}</td>
+                         <td>${s.S_neg_list[i]}</td><td><strong>${s.C_star_list[i]}</strong></td></tr>`;
+        });
+        html += '</tbody></table></div>';
+    }
+    document.getElementById('tStepContent').innerHTML = html;
+}
+
+function buildTTable(colHeaders, rowLabels, matrix, decimals) {
+    let html = '<div class="table-responsive"><table class="table table-sm" style="font-size:0.78rem"><thead><tr>';
+    html += '<th></th>';
+    colHeaders.forEach(h => { html += `<th>${h}</th>`; });
+    html += '</tr></thead><tbody>';
+    matrix.forEach((row, i) => {
+        html += `<tr><th style="color:var(--muted)">${rowLabels[i]}</th>`;
+        row.forEach(v => { html += `<td>${typeof v === 'number' ? v.toFixed(decimals) : v}</td>`; });
+        html += '</tr>';
+    });
+    html += '</tbody></table></div>';
+    return html;
+}
+
+async function exportReport() {
+    if (!topsisData) { alert('Сначала запустите TOPSIS'); return; }
+    const finIds = [...document.querySelectorAll('.form-check-input:checked')]
+                       .map(cb => parseInt(cb.value));
+    const resp = await fetch('/api/reports/export', {
+        method: 'POST',
+        headers: {'Content-Type': 'application/json'},
+        body: JSON.stringify({
+            motor_ids:       JSON.parse(localStorage.getItem('selectedMotorIds') || '[]'),
+            topsis_ranking:  topsisData.ranking,
+            ahp_ranking:     ahpData.ranking || [],
+            project_name:    'DPT_Selection',
+            mode:            'full'
+        })
+    });
+    if (resp.ok) {
+        const blob = await resp.blob();
+        const url  = URL.createObjectURL(blob);
+        const a    = document.createElement('a');
+        a.href     = url;
+        a.download = 'dpt_report.xlsx';
+        a.click();
+    }
+}
+
+initFinalists();
+</script>
+{% endblock %}

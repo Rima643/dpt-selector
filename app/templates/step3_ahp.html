@@ -1,0 +1,266 @@
+{% extends "base.html" %}
+{% block title %}Шаг 3 — МАИ{% endblock %}
+{% block content %}
+<h2 class="mb-4">
+    <span class="step-badge me-2">3</span> Шаг 3 — Метод анализа иерархий (МАИ)
+</h2>
+
+<div class="row g-4">
+<div class="col-md-4">
+    <div class="card">
+        <div class="card-header">Настройка критериев</div>
+        <div class="card-body">
+            <div class="mb-3">
+                <label class="form-label">Набор критериев</label>
+                <select class="form-select" id="criteriaSet" onchange="onCriteriaChange()">
+                    <option value="default">K1,K2,K3,K4,K5,K10 (из Excel)</option>
+                    <option value="pca">Сокращённый по PCA (топ-3)</option>
+                    <option value="custom">Пользовательский</option>
+                </select>
+            </div>
+            <div id="weightsBlock">
+                <label class="form-label">Матрица попарных сравнений критериев</label>
+                <p style="color:var(--muted);font-size:0.8rem">
+                    Значения по шкале Саати 1-9.<br>
+                    Матрица заполнена по данным Excel.
+                </p>
+                <div id="matrixContainer"></div>
+            </div>
+            <button class="btn btn-primary w-100 mt-3" onclick="runAHP()">
+                Запустить МАИ
+            </button>
+        </div>
+    </div>
+</div>
+
+<div class="col-md-8">
+    <div id="ahpResults" class="d-none">
+        <div class="card mb-4">
+            <div class="card-header">Веса критериев</div>
+            <div class="card-body">
+                <div id="weightsChart"></div>
+                <div id="consistencyInfo"></div>
+            </div>
+        </div>
+
+        <div class="card mb-4">
+            <div class="card-header">Пошаговые вычисления</div>
+            <div class="card-body">
+                <ul class="nav nav-tabs mb-3" id="ahpTabs">
+                    <li class="nav-item">
+                        <button class="nav-link active" data-tab="pairwise"
+                            onclick="showAHPTab('pairwise')">1. Матрица критериев</button>
+                    </li>
+                    <li class="nav-item">
+                        <button class="nav-link" data-tab="norm"
+                            onclick="showAHPTab('norm')">2. Нормировка</button>
+                    </li>
+                    <li class="nav-item">
+                        <button class="nav-link" data-tab="local"
+                            onclick="showAHPTab('local')">3. Локальные приоритеты</button>
+                    </li>
+                    <li class="nav-item">
+                        <button class="nav-link" data-tab="ranking"
+                            onclick="showAHPTab('ranking')">4. Ранжирование</button>
+                    </li>
+                </ul>
+                <div id="ahpStepContent"></div>
+            </div>
+        </div>
+
+        <div class="mt-3 d-flex justify-content-between">
+            <a href="/step2" class="btn btn-outline-secondary">Назад</a>
+            <button class="btn btn-success" onclick="goToStep4()">
+                Перейти к TOPSIS
+            </button>
+        </div>
+    </div>
+</div>
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script>
+let ahpData = null;
+let clusterData = JSON.parse(localStorage.getItem('clusterData') || '{}');
+let selectedIds = JSON.parse(localStorage.getItem('selectedMotorIds') || '[]');
+
+const DEFAULT_MATRIX = [
+    [1,    3,    2,    5,    7,    9   ],
+    [1/3,  1,    0.5,  3,    5,    7   ],
+    [0.5,  2,    1,    4,    6,    8   ],
+    [0.2,  1/3,  0.25, 1,    2,    4   ],
+    [1/7,  0.2,  1/6,  0.5,  1,    3   ],
+    [1/9,  1/7,  0.125,0.25, 1/3,  1   ],
+];
+
+const CRIT_LABELS = ['K1 Мощность','K2 КПД','K3 Момент',
+                     'K4 Ток','K5 Масса','K10 Цена'];
+
+let currentMatrix = DEFAULT_MATRIX.map(r => [...r]);
+
+function onCriteriaChange() {
+    renderMatrix();
+}
+
+function renderMatrix() {
+    const n = currentMatrix.length;
+    let html = '<div class="table-responsive"><table class="table table-sm" style="font-size:0.75rem"><thead><tr><th></th>';
+    CRIT_LABELS.slice(0, n).forEach(l => { html += `<th>${l}</th>`; });
+    html += '</tr></thead><tbody>';
+    for (let i = 0; i < n; i++) {
+        html += `<tr><th style="white-space:nowrap;color:var(--muted)">${CRIT_LABELS[i]}</th>`;
+        for (let j = 0; j < n; j++) {
+            const v = currentMatrix[i][j];
+            const diag = i === j;
+            html += `<td><input type="number"
+                style="width:60px;padding:2px;font-size:0.75rem;background:var(--card2);
+                       color:var(--text);border:1px solid var(--border);border-radius:4px"
+                id="m${i}_${j}" value="${Math.round(v*1000)/1000}"
+                step="any" ${diag ? 'disabled' : ''}
+                onchange="updateMatrix(${i},${j})"></td>`;
+        }
+        html += '</tr>';
+    }
+    html += '</tbody></table></div>';
+    document.getElementById('matrixContainer').innerHTML = html;
+}
+
+function updateMatrix(i, j) {
+    const v = parseFloat(document.getElementById(`m${i}_${j}`).value);
+    if (!isNaN(v) && v > 0) {
+        currentMatrix[i][j] = v;
+        currentMatrix[j][i] = 1 / v;
+        const el = document.getElementById(`m${j}_${i}`);
+        if (el) el.value = Math.round(1/v * 1000) / 1000;
+    }
+}
+
+async function runAHP() {
+    const btn = document.querySelector('button[onclick="runAHP()"]');
+    btn.textContent = 'Вычисление...';
+    btn.disabled = true;
+
+    const resp = await fetch('/api/analysis/ahp', {
+        method: 'POST',
+        headers: {'Content-Type': 'application/json'},
+        body: JSON.stringify({
+            motor_ids: selectedIds,
+            custom_matrix: currentMatrix
+        })
+    });
+    ahpData = await resp.json();
+
+    btn.textContent = 'Запустить МАИ';
+    btn.disabled = false;
+    document.getElementById('ahpResults').classList.remove('d-none');
+
+    renderWeights();
+    showAHPTab('pairwise');
+}
+
+function renderWeights() {
+    const steps = ahpData.steps;
+    const cons  = ahpData.consistency[0];
+
+    let html = '<div class="row g-2 mb-3">';
+    steps.criteria_labels.forEach((lbl, i) => {
+        const pct = Math.round(steps.weights[i] * 100);
+        html += `<div class="col-md-4">
+            <div style="font-size:0.85rem;color:var(--muted)">${lbl}</div>
+            <div class="progress" style="height:20px;border-radius:6px">
+                <div class="progress-bar" style="width:${pct*3}%;background:var(--primary);
+                    font-size:0.75rem;line-height:20px">
+                    ${steps.weights[i]}
+                </div>
+            </div>
+        </div>`;
+    });
+    html += '</div>';
+    document.getElementById('weightsChart').innerHTML = html;
+
+    const status = cons.consistent ? 'alert-success' : 'alert-warning';
+    document.getElementById('consistencyInfo').innerHTML = `
+    <div class="alert ${status} mb-0" style="font-size:0.85rem">
+        lambda_max = ${cons.lambda_max} &nbsp;|&nbsp;
+        ИС = ${cons.CI} &nbsp;|&nbsp;
+        RI = ${cons.RI} &nbsp;|&nbsp;
+        ОС = ${cons.CR} &nbsp;
+        ${cons.consistent ? '— матрица согласована' : '— матрица НЕ согласована'}
+    </div>`;
+}
+
+function showAHPTab(tab) {
+    document.querySelectorAll('[data-tab]').forEach(b => {
+        b.classList.toggle('active', b.dataset.tab === tab);
+    });
+    const steps = ahpData.steps;
+    let html = '';
+
+    if (tab === 'pairwise') {
+        html = '<p style="color:var(--muted);font-size:0.8rem">Матрица попарных сравнений критериев (A)</p>';
+        html += buildTable(steps.criteria_labels, steps.criteria_labels,
+                           steps.pairwise_matrix, 4);
+        html += `<p style="color:var(--muted);font-size:0.8rem;margin-top:8px">
+            Суммы столбцов: ${steps.col_sums.join(' | ')}
+        </p>`;
+    } else if (tab === 'norm') {
+        html = '<p style="color:var(--muted);font-size:0.8rem">Нормализованная матрица (A / col_sum)</p>';
+        html += buildTable(steps.criteria_labels, steps.criteria_labels,
+                           steps.normalized_matrix, 4);
+        html += '<p style="color:var(--muted);font-size:0.8rem;margin-top:8px">Веса (среднее строк): ';
+        html += steps.weights.map((w,i) =>
+            `${steps.criteria_labels[i]}=${w}`).join(' | ');
+        html += '</p>';
+    } else if (tab === 'local') {
+        html = '<p style="color:var(--muted);font-size:0.8rem">Локальные приоритеты альтернатив по каждому критерию</p>';
+        html += buildTable(steps.criteria_labels, steps.motor_codes,
+                           steps.local_priorities, 4);
+    } else if (tab === 'ranking') {
+        html = '<div class="table-responsive"><table class="table"><thead><tr>';
+        html += '<th>Ранг</th><th>Код</th><th>Двигатель</th><th>Zi</th></tr></thead><tbody>';
+        ahpData.ranking.forEach(r => {
+            const cls = r.rank === 1 ? 'winner-row' : '';
+            html += `<tr class="${cls}">
+                <td>${r.rank === 1 ? '#1' : r.rank}</td>
+                <td>${r.code}</td><td>${r.name}</td>
+                <td><strong>${r.Zi}</strong></td>
+            </tr>`;
+        });
+        html += `</tbody></table></div>
+        <div class="alert alert-success mt-2">
+            Лидер: <strong>${ahpData.winner.code} — ${ahpData.winner.name}</strong>
+            (Zi = ${ahpData.winner.Zi})
+        </div>`;
+    }
+    document.getElementById('ahpStepContent').innerHTML = html;
+}
+
+function buildTable(colHeaders, rowLabels, matrix, decimals) {
+    let html = '<div class="table-responsive"><table class="table table-sm" style="font-size:0.8rem"><thead><tr>';
+    if (rowLabels.length) html += '<th></th>';
+    colHeaders.forEach(h => { html += `<th>${h}</th>`; });
+    html += '</tr></thead><tbody>';
+    matrix.forEach((row, i) => {
+        html += '<tr>';
+        if (rowLabels.length) html += `<th style="color:var(--muted)">${rowLabels[i]}</th>`;
+        row.forEach(v => {
+            html += `<td>${typeof v === 'number' ? v.toFixed(decimals) : v}</td>`;
+        });
+        html += '</tr>';
+    });
+    html += '</tbody></table></div>';
+    return html;
+}
+
+function goToStep4() {
+    if (!ahpData) { alert('Сначала запустите МАИ'); return; }
+    localStorage.setItem('ahpData', JSON.stringify(ahpData));
+    const winnerIds = ahpData.ranking.slice(0, 3).map(r => r.id);
+    localStorage.setItem('finalistIds', JSON.stringify(winnerIds));
+    window.location.href = '/step4';
+}
+
+renderMatrix();
+</script>
+{% endblock %}

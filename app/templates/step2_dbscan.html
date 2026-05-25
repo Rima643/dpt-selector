@@ -1,0 +1,246 @@
+{% extends "base.html" %}
+{% block title %}Шаг 2 — DBSCAN + PCA{% endblock %}
+{% block content %}
+<h2 class="mb-4">
+    <span class="step-badge me-2">2</span> Шаг 2 — Кластеризация DBSCAN и анализ PCA
+</h2>
+
+<div class="card mb-4">
+    <div class="card-header">Параметры кластеризации</div>
+    <div class="card-body">
+        <div class="row g-3 align-items-end">
+            <div class="col-md-3">
+                <label class="form-label">eps (радиус окрестности)</label>
+                <input type="number" class="form-control" id="eps" value="1.5" step="0.1" min="0.1">
+            </div>
+            <div class="col-md-3">
+                <label class="form-label">min_samples (мин. точек)</label>
+                <input type="number" class="form-control" id="minSamples" value="3" min="2" step="1">
+            </div>
+            <div class="col-md-4">
+                <label class="form-label">Признаки для кластеризации</label>
+                <select class="form-select" id="featureSet">
+                    <option value="default">K1, K2, K3, K5, K10 (как в ноутбуке)</option>
+                    <option value="extended">K1-K5, K10 (расширенный)</option>
+                </select>
+            </div>
+            <div class="col-md-2">
+                <button class="btn btn-primary w-100" onclick="runClustering()">
+                    Запустить
+                </button>
+            </div>
+        </div>
+    </div>
+</div>
+
+<div id="results" class="d-none">
+    <div class="row g-4 mb-4">
+        <div class="col-md-4">
+            <div class="card text-center">
+                <div class="card-body py-4">
+                    <div style="font-size:2.5rem;font-weight:700;color:var(--teal)" id="nClusters">-</div>
+                    <div style="color:var(--muted)">Кластеров</div>
+                </div>
+            </div>
+        </div>
+        <div class="col-md-4">
+            <div class="card text-center">
+                <div class="card-body py-4">
+                    <div style="font-size:2.5rem;font-weight:700;color:var(--primary)" id="nMotors">-</div>
+                    <div style="color:var(--muted)">Двигателей</div>
+                </div>
+            </div>
+        </div>
+        <div class="col-md-4">
+            <div class="card text-center">
+                <div class="card-body py-4">
+                    <div style="font-size:2.5rem;font-weight:700;color:#f7614f" id="nNoise">-</div>
+                    <div style="color:var(--muted)">Выбросов</div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <div class="row g-4">
+        <div class="col-md-6">
+            <div class="card">
+                <div class="card-header">Состав кластеров</div>
+                <div class="card-body" id="clusterList"></div>
+            </div>
+        </div>
+        <div class="col-md-6">
+            <div class="card">
+                <div class="card-header">Значимость критериев (PCA)</div>
+                <div class="card-body" id="pcaResult"></div>
+            </div>
+        </div>
+    </div>
+
+    <div class="card mt-4">
+        <div class="card-header">Пошаговые вычисления DBSCAN</div>
+        <div class="card-body">
+            <ul class="nav nav-tabs mb-3" id="stepTabs">
+                <li class="nav-item">
+                    <button class="nav-link active" data-tab="raw"
+                        onclick="showTab('raw')">Исходные данные</button>
+                </li>
+                <li class="nav-item">
+                    <button class="nav-link" data-tab="scaled"
+                        onclick="showTab('scaled')">Стандартизация</button>
+                </li>
+                <li class="nav-item">
+                    <button class="nav-link" data-tab="labels"
+                        onclick="showTab('labels')">Метки кластеров</button>
+                </li>
+                <li class="nav-item">
+                    <button class="nav-link" data-tab="pca_var"
+                        onclick="showTab('pca_var')">PCA дисперсия</button>
+                </li>
+            </ul>
+            <div id="stepContent"></div>
+        </div>
+    </div>
+
+    <div class="mt-4 d-flex justify-content-between">
+        <a href="/step1" class="btn btn-outline-secondary">Назад</a>
+        <button class="btn btn-success" onclick="goToStep3()">
+            Перейти к МАИ
+        </button>
+    </div>
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script>
+let clusterData = null;
+const COLORS = {'-1':'#f7614f','0':'#4867D6','1':'#3dd68c','2':'#ffd166','3':'#e07ef3'};
+
+async function runClustering() {
+    const ids = JSON.parse(localStorage.getItem('selectedMotorIds') || '[]');
+    if (ids.length < 3) {
+        alert('Вернитесь на шаг 1 и выберите двигатели');
+        return;
+    }
+
+    const btn = document.querySelector('button[onclick="runClustering()"]');
+    btn.textContent = 'Вычисление...';
+    btn.disabled = true;
+
+    const resp = await fetch('/api/analysis/cluster', {
+        method: 'POST',
+        headers: {'Content-Type': 'application/json'},
+        body: JSON.stringify({motor_ids: ids})
+    });
+    clusterData = await resp.json();
+
+    btn.textContent = 'Запустить';
+    btn.disabled = false;
+
+    document.getElementById('nClusters').textContent = clusterData.n_clusters;
+    document.getElementById('nMotors').textContent   = clusterData.n_motors;
+    document.getElementById('nNoise').textContent    = clusterData.n_noise;
+    document.getElementById('results').classList.remove('d-none');
+
+    renderClusters();
+    renderPCA();
+    showTab('raw');
+}
+
+function renderClusters() {
+    const clusters = clusterData.clusters;
+    let html = '';
+    for (const [key, motors] of Object.entries(clusters).sort()) {
+        const color = COLORS[key] || '#aaa';
+        const label = key === '-1' ? 'Выбросы' : `Кластер ${key}`;
+        html += `
+        <div class="mb-3">
+            <span class="badge me-2" style="background:${color}">${label}</span>
+            <span style="color:var(--muted);font-size:0.85rem">${motors.length} двигателей</span>
+            <div style="font-size:0.85rem;margin-top:4px;color:var(--text)">
+                ${motors.map(m => `<span class="badge bg-secondary me-1 mb-1">${m.code}</span>`).join('')}
+            </div>
+        </div>`;
+    }
+    document.getElementById('clusterList').innerHTML = html;
+}
+
+function renderPCA() {
+    const pca = clusterData.pca;
+    let html = `<p style="color:var(--muted);font-size:0.85rem">
+        PC1: ${(pca.pc1_var*100).toFixed(1)}% &nbsp;
+        PC2: ${(pca.pc2_var*100).toFixed(1)}% &nbsp;
+        Порог 85%: ${pca.n_components_85} компонент
+    </p>
+    <ol style="font-size:0.85rem">`;
+    pca.criteria_importance.forEach(c => {
+        const pct = Math.round(c.loading * 100);
+        html += `<li class="mb-1">
+            <strong>${c.label}</strong> — ${c.loading}
+            <div class="progress mt-1" style="height:6px">
+                <div class="progress-bar" style="width:${pct}%;background:var(--teal)"></div>
+            </div>
+        </li>`;
+    });
+    html += '</ol>';
+    document.getElementById('pcaResult').innerHTML = html;
+}
+
+function showTab(tab) {
+    document.querySelectorAll('[data-tab]').forEach(b => {
+        b.classList.toggle('active', b.dataset.tab === tab);
+    });
+
+    const steps = clusterData.steps;
+    const pca   = clusterData.pca;
+    let html = '';
+
+    if (tab === 'raw') {
+        html = buildTable(steps.features, steps.motor_codes, steps.raw_matrix, 4);
+    } else if (tab === 'scaled') {
+        html = `<p style="color:var(--muted);font-size:0.85rem">
+            Средние: ${steps.means.join(', ')}<br>
+            Std: ${steps.stds.join(', ')}
+        </p>` + buildTable(steps.features, steps.motor_codes, steps.scaled_matrix, 4);
+    } else if (tab === 'labels') {
+        const rows = steps.motor_codes.map((code, i) => [
+            code, steps.labels_list[i]
+        ]);
+        html = buildTable(['Код','Кластер'], [], rows, 0);
+    } else if (tab === 'pca_var') {
+        html = '<div class="row"><div class="col-6"><table class="table table-sm">';
+        html += '<thead><tr><th>PC</th><th>Дисперсия</th><th>Накопл.</th></tr></thead><tbody>';
+        pca.explained_variance.forEach((v, i) => {
+            html += `<tr><td>PC${i+1}</td><td>${(v*100).toFixed(2)}%</td>
+                        <td>${(pca.cumulative_variance[i]*100).toFixed(2)}%</td></tr>`;
+        });
+        html += '</tbody></table></div></div>';
+    }
+    document.getElementById('stepContent').innerHTML = html;
+}
+
+function buildTable(headers, rowLabels, matrix, decimals) {
+    let html = '<div class="table-responsive"><table class="table table-sm"><thead><tr>';
+    if (rowLabels.length) html += '<th>Двигатель</th>';
+    headers.forEach(h => { html += `<th>${h}</th>`; });
+    html += '</tr></thead><tbody>';
+    matrix.forEach((row, i) => {
+        html += '<tr>';
+        if (rowLabels.length) html += `<td>${rowLabels[i]}</td>`;
+        row.forEach(v => {
+            const val = typeof v === 'number'
+                ? (decimals ? v.toFixed(decimals) : v) : v;
+            html += `<td>${val}</td>`;
+        });
+        html += '</tr>';
+    });
+    html += '</tbody></table></div>';
+    return html;
+}
+
+function goToStep3() {
+    if (!clusterData) { alert('Сначала запустите кластеризацию'); return; }
+    localStorage.setItem('clusterData', JSON.stringify(clusterData));
+    window.location.href = '/step3';
+}
+</script>
+{% endblock %}

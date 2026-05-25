@@ -1,0 +1,65 @@
+{% extends "base.html" %}
+{% block title %}Главная{% endblock %}
+{% block content %}
+
+<div style="text-align:center; padding: 60px 20px 40px;">
+  <h1 style="color:#1435AD; font-size:2.5rem; font-weight:700; margin-bottom:16px;">
+    Программный модуль выбора ДПТ
+  </h1>
+  <p style="color:#4a6fa5; font-size:1.1rem; margin-bottom:32px;">
+    Многокритериальный выбор двигателя постоянного тока для КФС<br>
+    методами DBSCAN + PCA — АНР (МАИ) — TOPSIS
+  </p>
+  <div class="d-flex justify-content-center gap-3 flex-wrap">
+    <a href="/step1" class="btn btn-primary px-4 py-2" style="border-radius:25px; font-size:1rem;">
+      Начать подбор
+    </a>
+    <a href="/docs" target="_blank" class="btn btn-outline-secondary px-4 py-2" style="border-radius:25px; font-size:1rem;">
+      API документация
+    </a>
+  </div>
+</div>
+
+<div class="row g-4 mt-2">
+  <div class="col-md-4">
+    <div class="card h-100 step-card">
+      <div class="card-header text-white d-flex align-items-center gap-2">
+        <strong style="background:#fff; color:#1435AD; border-radius:50%; width:28px; height:28px;
+                        display:flex; align-items:center; justify-content:center; font-size:0.9rem;">1</strong>
+        <span>Этап 1 — Кластеризация</span>
+      </div>
+      <div class="card-body">
+        <p>Алгоритм <strong>DBSCAN</strong> разбивает двигатели на группы.<br>
+           <strong>PCA</strong> определяет значимость критериев.</p>
+      </div>
+    </div>
+  </div>
+
+  <div class="col-md-4">
+    <div class="card h-100 step-card">
+      <div class="card-header text-white d-flex align-items-center gap-2">
+        <strong style="background:#fff; color:#1435AD; border-radius:50%; width:28px; height:28px;
+                        display:flex; align-items:center; justify-content:center; font-size:0.9rem;">2</strong>
+        <span>Этап 2 — АНР (МАИ)</span>
+      </div>
+      <div class="card-body">
+        <p>Метод анализа иерархий выбирает <strong>лучшую альтернативу</strong> внутри каждого кластера с проверкой согласованности.</p>
+      </div>
+    </div>
+  </div>
+
+  <div class="col-md-4">
+    <div class="card h-100 step-card">
+      <div class="card-header text-white d-flex align-items-center gap-2">
+        <strong style="background:#fff; color:#1435AD; border-radius:50%; width:28px; height:28px;
+                        display:flex; align-items:center; justify-content:center; font-size:0.9rem;">3</strong>
+        <span>Этап 3 — TOPSIS</span>
+      </div>
+      <div class="card-body">
+        <p>Метод <strong>TOPSIS</strong> ранжирует лидеров кластеров и выдаёт финального победителя.</p>
+      </div>
+    </div>
+  </div>
+</div>
+
+{% endblock %}
