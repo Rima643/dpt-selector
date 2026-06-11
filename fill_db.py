@@ -1,13 +1,10 @@
-import sys
-sys.path.insert(0, r'C:\Users\rimad\PycharmProjects\PythonProject1')
-
 from app.database.database import engine, Base, SessionLocal
 from app.models.motor import Motor
 
 Base.metadata.create_all(engine)
 
-motors_data = [
-    # code,  name,                        k1,  k2,    k3,   k4,    k5,    k6,  k7,      k8,  k9,   k10, k11, k12, k13, k14, k15, k16, k17,  k18, k19, k20, k21, k22, k23, k24, k25, k26
+MOTORS = [
+    # code,  name,                        k1,  k2,    k3,   k4,    k5,    k6,  k7,      k8,  k9,   k10, k11, k12, k13, k14, k15, k16,  k17,  k18, k19, k20, k21, k22, k23, k24, k25, k26
     ("A1",  "ELDIN Д-21М",               11,  1500,  2.0,  87.5,  70.0,  59,  0.083,  185,  48,   2,   3,   2,   2,   2,   5,   2.0, "S1", 7,   3,   3,   82,  30,  3,   5,   1,   5),
     ("A2",  "ELDIN Д-22М",               15,  1500,  2.0,  88.0,  95.5,  79,  0.083,  220,  55,   2,   3,   2,   2,   2,   5,   2.0, "S1", 7,   3,   3,   82,  30,  3,   5,   1,   5),
     ("A3",  "СЭМ ДПМ-160S",              11,  1500,  2.5,  84.5,  70.0,  63,  0.048,  151,  56,   4,   3,   4,   2,   2,   5,   2.5, "S1", 11,  3,   5,   81,  25,  2,   5,   1,   5),
@@ -35,26 +32,27 @@ motors_data = [
     ("A25", "WEG DCAW 160M",               15,  1500,  2.5,  88.4,  95.7,  80,  0.082,  218,  91,   4,   3,   4,   3,   2,   5,   2.5, "S1", 11,  3,   4,   81,  30,  2,   5,   2,   5),
 ]
 
-db = SessionLocal()
-try:
-    for row in motors_data:
-        existing = db.query(Motor).filter(Motor.code == row[0]).first()
-        if existing:
-            continue
-        m = Motor(
-            code=row[0], name=row[1],
-            k1_power=row[2],   k2_speed=row[3],   k3_range=row[4],
-            k4_eff=row[5],     k5_torque=row[6],  k6_current=row[7],
-            k7_inertia=row[8], k8_mass=row[9],    k9_price=row[10],
-            k10_ip=row[11],    k11_climat=row[12], k12_cool=row[13],
-            k13_mount=row[14], k14_spark=row[15], k15_revers=row[16],
-            k16_load=row[17],  k17_mode=row[18],  k18_env=row[19],
-            k19_mech=row[20],  k20_insul=row[21], k21_noise=row[22],
-            k22_mtbf=row[23],  k23_maint=row[24], k24_excit=row[25],
-            k25_repair=row[26], k26_compat=row[27],
-        )
-        db.add(m)
-    db.commit()
-    print("Готово: 25 двигателей добавлены")
-finally:
-    db.close()
+if __name__ == "__main__":
+    db = SessionLocal()
+    try:
+        for row in MOTORS:
+            existing = db.query(Motor).filter(Motor.code == row[0]).first()
+            if existing:
+                continue
+            m = Motor(
+                code=row[0], name=row[1],
+                k1_power=row[2],   k2_speed=row[3],   k3_range=row[4],
+                k4_eff=row[5],     k5_torque=row[6],  k6_current=row[7],
+                k7_inertia=row[8], k8_mass=row[9],    k9_price=row[10],
+                k10_ip=row[11],    k11_climat=row[12], k12_cool=row[13],
+                k13_mount=row[14], k14_spark=row[15], k15_revers=row[16],
+                k16_load=row[17],  k17_mode=row[18],  k18_env=row[19],
+                k19_mech=row[20],  k20_insul=row[21], k21_noise=row[22],
+                k22_mtbf=row[23],  k23_maint=row[24], k24_excit=row[25],
+                k25_repair=row[26], k26_compat=row[27],
+            )
+            db.add(m)
+        db.commit()
+        print("Готово: 25 двигателей добавлены")
+    finally:
+        db.close()
