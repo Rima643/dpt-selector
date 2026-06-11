@@ -1,20 +1,63 @@
 from sqlalchemy import Column, Integer, Float, String
 from app.database.database import Base
 
+
 class Motor(Base):
     __tablename__ = "motors"
 
-    id          = Column(Integer, primary_key=True, index=True)
-    code        = Column(String(50), nullable=False)
-    name        = Column(String(255), nullable=False)
-    k1_power    = Column(Float)   # мощность кВт max
-    k2_eff      = Column(Float)   # КПД % max
-    k3_torque   = Column(Float)   # момент Нм max
-    k4_current  = Column(Float)   # ток А min
-    k5_mass     = Column(Float)   # масса кг min
-    k6_ip       = Column(Integer) # IP 23/44
-    k7_cooling  = Column(Integer) # охлаждение 1/3
-    k8_inertia  = Column(Float)   # инерция кг*м2
-    k9_mount    = Column(Integer) # монтаж
-    k10_price   = Column(Float)   # цена тыс.руб min
-    k12_speed   = Column(Float)   # скорость об/мин
+    id   = Column(Integer, primary_key=True, index=True)
+    code = Column(String(50), nullable=False)
+    name = Column(String(255), nullable=False)
+
+    # K1 – мощность, кВт (max)
+    k1_power    = Column(Float)
+    # K2 – номинальная скорость, об/мин (справ.)
+    k2_speed    = Column(Float)
+    # K3 – диапазон регулирования D=nmax/nном (max)
+    k3_range    = Column(Float)
+    # K4 – КПД η, % (max)
+    k4_eff      = Column(Float)
+    # K5 – момент M, Н·м (max)
+    k5_torque   = Column(Float)
+    # K6 – ток якоря Iя, А (min)
+    k6_current  = Column(Float)
+    # K7 – момент инерции J, кг·м² (min)
+    k7_inertia  = Column(Float)
+    # K8 – масса, кг (min)
+    k8_mass     = Column(Float)
+    # K9 – цена, тыс.руб (min)
+    k9_price    = Column(Float)
+    # K10 – степень защиты IP, балл (max)
+    k10_ip      = Column(Integer)
+    # K11 – климатическое исполнение, балл (max)
+    k11_climate = Column(Integer)
+    # K12 – охлаждение IC, балл (max)
+    k12_cooling = Column(Integer)
+    # K13 – монтажное исполнение IM, балл (max)
+    k13_mount   = Column(Integer)
+    # K14 – искрозащита, балл (порог)
+    k14_spark   = Column(Integer)
+    # K15 – рег.+реверс, балл (порог)
+    k15_reverse = Column(Integer)
+    # K16 – перегрузочная способность λ (max)
+    k16_overload = Column(Float)
+    # K17 – режим работы (порог)
+    k17_mode    = Column(String(10))
+    # K18 – условия эксплуатации свод, балл (справ.)
+    k18_env     = Column(Integer)
+    # K19 – механизмы, балл (порог)
+    k19_mech    = Column(Integer)
+    # K20 – класс изоляции, балл (max)
+    k20_insul   = Column(Integer)
+    # K21 – шум, дБА (min)
+    k21_noise   = Column(Float)
+    # K22 – MTBF, тыс.ч (max)
+    k22_mtbf    = Column(Float)
+    # K23 – требовательность к ТО, балл (min)
+    k23_maint   = Column(Integer)
+    # K24 – тип возбуждения (порог)
+    k24_excit   = Column(Integer)
+    # K25 – ремонтопригодность, балл (min)
+    k25_repair  = Column(Integer)
+    # K26 – совместимость с СУ (порог)
+    k26_compat  = Column(Integer)

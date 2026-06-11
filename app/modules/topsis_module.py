@@ -1,14 +1,37 @@
 import numpy as np
 
-# Критерии и веса точно из листа TOPSIS Excel строка 10
-CRITERIA_KEYS   = ["k1_power","k2_eff","k3_torque",
-                   "k4_current","k5_mass","k10_price"]
-CRITERIA_LABELS = ["K1 Мощность, кВт","K2 КПД, %","K3 Момент, Нм",
-                   "K4 Ток якоря, А","K5 Масса, кг","K10 Стоимость, тыс.р."]
-DIRECTIONS      = ["max","max","max","min","min","min"]
+# Критерии и веса из листа TOPSIS, строка 9 (w_j)
+# Порядок: K3, K4, K5, K6, K7, K8, K9, K10, K11, K12, K13, K16, K20, K21, K22, K23, K25
+CRITERIA_KEYS = [
+    "k3_range", "k4_eff", "k5_torque",
+    "k6_current", "k7_inertia", "k8_mass", "k9_price",
+    "k10_ip", "k11_climate", "k12_cooling", "k13_mount",
+    "k16_overload", "k20_insul",
+    "k21_noise", "k22_mtbf", "k23_maint", "k25_repair",
+]
+CRITERIA_LABELS = [
+    "K3 Диапазон D", "K4 КПД η, %", "K5 Момент M, Нм",
+    "K6 Ток Iя, А", "K7 Инерция J", "K8 Масса, кг", "K9 Цена, тыс.руб",
+    "K10 IP", "K11 Климат", "K12 Охлаждение", "K13 Монтаж IM",
+    "K16 Перегрузка λ", "K20 Кл.изол.",
+    "K21 Шум, дБА", "K22 MTBF, тыс.ч", "K23 ТО", "K25 Ремонт.",
+]
+DIRECTIONS = [
+    "max", "max", "max",
+    "min", "min", "min", "min",
+    "max", "max", "max", "max",
+    "max", "max",
+    "min", "max", "min", "min",
+]
 
-# Веса из Excel строка 10: 0.3943, 0.1807, 0.2694, 0.0802, 0.0492, 0.0263
-DEFAULT_WEIGHTS = [0.3943, 0.1807, 0.2694, 0.0802, 0.0492, 0.0263]
+# Веса из листа TOPSIS строка 9 (сумма = 1.0)
+DEFAULT_WEIGHTS = [
+    0.0437, 0.1098, 0.1697,
+    0.0421, 0.0371, 0.0371, 0.1098,
+    0.0151, 0.0081, 0.0081, 0.0044,
+    0.1697, 0.1098,
+    0.0208, 0.0437, 0.0234, 0.0476,
+]
 
 
 def run_topsis(motors, custom_weights=None,
@@ -18,25 +41,22 @@ def run_topsis(motors, custom_weights=None,
     w = np.array(custom_weights if custom_weights else DEFAULT_WEIGHTS,
                  dtype=float)
 
-    # Матрица решений U
     U = np.zeros((n, m))
     for i, motor in enumerate(motors):
         for j, key in enumerate(CRITERIA_KEYS):
             U[i, j] = float(getattr(motor, key) or 0)
 
-    # Шаг 1: квадраты и корни (как в Excel строки 12-20)
-    U_sq    = U ** 2
+    # Шаг 1: нормировка
+    U_sq = U ** 2
     col_sq_sum = U_sq.sum(axis=0)
-    col_norms  = np.sqrt(col_sq_sum)
+    col_norms = np.sqrt(col_sq_sum)
     col_norms[col_norms == 0] = 1e-10
-
-    # Нормированная матрица r_ij = u_ij / sqrt(sum u^2)
     R = U / col_norms
 
-    # Шаг 2: взвешенная нормированная матрица v_ij = r_ij * w_j
+    # Шаг 2: взвешенная нормированная матрица
     V = R * w
 
-    # Шаг 3: идеальное A* и антиидеальное A- (строки 41-42 Excel)
+    # Шаг 3: идеальное и анти-идеальное решения
     if ideal_best_custom:
         A_star = np.array(ideal_best_custom, dtype=float)
     else:
@@ -53,18 +73,17 @@ def run_topsis(motors, custom_weights=None,
             for j in range(m)
         ])
 
-    # Шаг 4: расстояния S* и S- (строки 47-59 Excel)
+    # Шаг 4: расстояния
     diff_star = (V - A_star) ** 2
-    diff_neg  = (V - A_neg)  ** 2
+    diff_neg = (V - A_neg) ** 2
     S_star = np.sqrt(diff_star.sum(axis=1))
-    S_neg  = np.sqrt(diff_neg.sum(axis=1))
+    S_neg = np.sqrt(diff_neg.sum(axis=1))
 
-    # Шаг 5: коэффициент близости C* (строки 62-67 Excel)
+    # Шаг 5: коэффициент близости
     denom = S_star + S_neg
     denom[denom == 0] = 1e-10
     C = S_neg / denom
 
-    # Ранжирование
     rank_order = np.argsort(C)[::-1]
     ranks = np.empty(n, dtype=int)
     ranks[rank_order] = np.arange(1, n + 1)
@@ -86,7 +105,6 @@ def run_topsis(motors, custom_weights=None,
     return {
         "winner":  ranking[0],
         "ranking": ranking,
-        # Все шаги для отображения
         "steps": {
             "criteria_labels":   CRITERIA_LABELS,
             "criteria_keys":     CRITERIA_KEYS,
