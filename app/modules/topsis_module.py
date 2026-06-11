@@ -5,8 +5,8 @@ import numpy as np
 CRITERIA_KEYS = [
     "k3_range", "k4_eff", "k5_torque",
     "k6_current", "k7_inertia", "k8_mass", "k9_price",
-    "k10_ip", "k11_climate", "k12_cooling", "k13_mount",
-    "k16_overload", "k20_insul",
+    "k10_ip", "k11_climat", "k12_cool", "k13_mount",
+    "k16_load", "k20_insul",
     "k21_noise", "k22_mtbf", "k23_maint", "k25_repair",
 ]
 CRITERIA_LABELS = [
