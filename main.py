@@ -24,13 +24,15 @@ def _seed():
              k21, k22, k23, k24, k25, k26) = row
             db.add(Motor(
                 code=code, name=name,
-                k1_power=k1, k2_speed=k2, k3_range=k3, k4_eff=k4,
-                k5_torque=k5, k6_current=k6, k7_inertia=k7, k8_mass=k8,
-                k9_price=k9, k10_ip=k10, k11_climate=k11, k12_cooling=k12,
-                k13_mount=k13, k14_spark=k14, k15_reverse=k15,
-                k16_overload=k16, k17_mode=k17, k18_env=k18, k19_mech=k19,
-                k20_insul=k20, k21_noise=k21, k22_mtbf=k22, k23_maint=k23,
-                k24_excit=k24, k25_repair=k25, k26_compat=k26,
+                k1_power=k1,   k2_speed=k2,   k3_range=k3,
+                k4_eff=k4,     k5_torque=k5,  k6_current=k6,
+                k7_inertia=k7, k8_mass=k8,    k9_price=k9,
+                k10_ip=k10,    k11_climat=k11, k12_cool=k12,
+                k13_mount=k13, k14_spark=k14, k15_revers=k15,
+                k16_load=k16,  k17_mode=k17,  k18_env=k18,
+                k19_mech=k19,  k20_insul=k20, k21_noise=k21,
+                k22_mtbf=k22,  k23_maint=k23, k24_excit=k24,
+                k25_repair=k25, k26_compat=k26,
             ))
         db.commit()
         print(f"[seed] Добавлено {len(MOTORS)} двигателей")
