@@ -102,12 +102,23 @@ let finalistIds = JSON.parse(localStorage.getItem('finalistIds') || '[]');
 let selectedIds = JSON.parse(localStorage.getItem('selectedMotorIds') || '[]');
 
 const CRITERIA = [
-    {key:'k1_power',  label:'K1 Мощность, кВт', dir:'max'},
-    {key:'k2_eff',    label:'K2 КПД, %',         dir:'max'},
-    {key:'k3_torque', label:'K3 Момент, Нм',     dir:'max'},
-    {key:'k4_current',label:'K4 Ток, А',          dir:'min'},
-    {key:'k5_mass',   label:'K5 Масса, кг',       dir:'min'},
-    {key:'k10_price', label:'K10 Цена, т.р.',     dir:'min'},
+    {key:'k3_range',   label:'K3 Диапазон D',    dir:'max'},
+    {key:'k4_eff',     label:'K4 КПД η, %',       dir:'max'},
+    {key:'k5_torque',  label:'K5 Момент M, Нм',   dir:'max'},
+    {key:'k6_current', label:'K6 Ток Iя, А',       dir:'min'},
+    {key:'k7_inertia', label:'K7 Инерция J',       dir:'min'},
+    {key:'k8_mass',    label:'K8 Масса, кг',       dir:'min'},
+    {key:'k9_price',   label:'K9 Цена, тыс.руб',  dir:'min'},
+    {key:'k10_ip',     label:'K10 IP, балл',       dir:'max'},
+    {key:'k11_climat', label:'K11 Климат, балл',   dir:'max'},
+    {key:'k12_cool',   label:'K12 Охлажд., балл',  dir:'max'},
+    {key:'k13_mount',  label:'K13 Монтаж, балл',   dir:'max'},
+    {key:'k16_load',   label:'K16 Перегрузка λ',   dir:'max'},
+    {key:'k20_insul',  label:'K20 Кл.изол., балл', dir:'max'},
+    {key:'k21_noise',  label:'K21 Шум, дБА',       dir:'min'},
+    {key:'k22_mtbf',   label:'K22 MTBF, тыс.ч',   dir:'max'},
+    {key:'k23_maint',  label:'K23 ТО, балл',       dir:'min'},
+    {key:'k25_repair', label:'K25 Ремонт., балл',  dir:'min'},
 ];
 
 document.getElementById('idealMode').onchange = function() {

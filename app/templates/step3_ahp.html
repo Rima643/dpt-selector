@@ -12,10 +12,8 @@
         <div class="card-body">
             <div class="mb-3">
                 <label class="form-label">Набор критериев</label>
-                <select class="form-select" id="criteriaSet" onchange="onCriteriaChange()">
-                    <option value="default">K1,K2,K3,K4,K5,K10 (из Excel)</option>
-                    <option value="pca">Сокращённый по PCA (топ-3)</option>
-                    <option value="custom">Пользовательский</option>
+                <select class="form-select" id="criteriaSet">
+                    <option value="default">17 критериев (из Excel, лист МАИ Шум)</option>
                 </select>
             </div>
             <div id="weightsBlock">
@@ -85,28 +83,40 @@ let ahpData = null;
 let clusterData = JSON.parse(localStorage.getItem('clusterData') || '{}');
 let selectedIds = JSON.parse(localStorage.getItem('selectedMotorIds') || '[]');
 
-const DEFAULT_MATRIX = [
-    [1,    3,    2,    5,    7,    9   ],
-    [1/3,  1,    0.5,  3,    5,    7   ],
-    [0.5,  2,    1,    4,    6,    8   ],
-    [0.2,  1/3,  0.25, 1,    2,    4   ],
-    [1/7,  0.2,  1/6,  0.5,  1,    3   ],
-    [1/9,  1/7,  0.125,0.25, 1/3,  1   ],
+const CRIT_LABELS = [
+    'K3 Диапазон D', 'K4 КПД η', 'K5 Момент M',
+    'K6 Ток Iя', 'K7 Инерция J', 'K8 Масса', 'K9 Цена',
+    'K10 IP', 'K11 Климат', 'K12 Охлажд.', 'K13 Монтаж',
+    'K16 Перегрузка λ', 'K20 Кл.изол.',
+    'K21 Шум', 'K22 MTBF', 'K23 ТО', 'K25 Ремонт.'
 ];
 
-const CRIT_LABELS = ['K1 Мощность','K2 КПД','K3 Момент',
-                     'K4 Ток','K5 Масса','K10 Цена'];
+const DEFAULT_MATRIX = [
+    [1,    1/3,  1/2,  3,    5,    1/4,  1/4,  3,    3,    3,    4,    1/4,  1/3,  5,    1/5,  4,    5   ],
+    [3,    1,    2,    5,    7,    1/2,  1/2,  5,    5,    5,    6,    1/2,  1/2,  7,    1/3,  6,    7   ],
+    [2,    1/2,  1,    4,    6,    1/3,  1/3,  4,    4,    4,    5,    1/3,  1/3,  6,    1/4,  5,    6   ],
+    [1/3,  1/5,  1/4,  1,    3,    1/7,  1/7,  2,    2,    2,    3,    1/7,  1/6,  3,    1/8,  3,    3   ],
+    [1/4,  1/7,  1/6,  1/3,  1,    1/8,  1/8,  1/2,  1/2,  1/2,  1,    1/8,  1/7,  2,    1/9,  1,    2   ],
+    [4,    2,    3,    7,    8,    1,    1/2,  6,    6,    6,    7,    1/2,  1/2,  8,    1/3,  7,    8   ],
+    [1/3,  2,    3,    7,    8,    2,    1,    6,    6,    6,    7,    1/2,  1/2,  8,    1/3,  7,    8   ],
+    [1/3,  1/5,  1/4,  1/2,  2,    1/6,  1/6,  1,    1,    1,    2,    1/6,  1/5,  3,    1/7,  2,    3   ],
+    [1/3,  1/5,  1/4,  1/2,  2,    1/6,  1/6,  1,    1,    1,    2,    1/6,  1/5,  3,    1/7,  2,    3   ],
+    [1/3,  1/5,  1/4,  1/2,  2,    1/6,  1/6,  1,    1,    1,    2,    1/6,  1/5,  3,    1/7,  2,    3   ],
+    [1/4,  1/6,  1/5,  1/3,  1,    1/7,  1/7,  1/2,  1/2,  1/2,  1,    1/7,  1/6,  2,    1/8,  1,    2   ],
+    [4,    2,    3,    7,    8,    2,    2,    6,    6,    6,    7,    1,    1/2,  8,    1/3,  7,    8   ],
+    [3,    2,    3,    6,    7,    2,    2,    5,    5,    5,    6,    2,    1,    7,    1/2,  6,    7   ],
+    [1/5,  1/7,  1/6,  1/3,  1/2,  1/8,  1/8,  1/3,  1/3,  1/3,  1/2,  1/8,  1/7,  1,    1/9,  1/2,  1   ],
+    [5,    3,    4,    8,    9,    3,    3,    7,    7,    7,    8,    3,    2,    9,    1,    8,    9   ],
+    [1/4,  1/6,  1/5,  1/3,  1,    1/7,  1/7,  1/2,  1/2,  1/2,  1,    1/7,  1/6,  2,    1/8,  1,    2   ],
+    [1/5,  1/7,  1/6,  1/3,  1/2,  1/8,  1/8,  1/3,  1/3,  1/3,  1/2,  1/8,  1/7,  1,    1/9,  1/2,  1   ],
+];
 
 let currentMatrix = DEFAULT_MATRIX.map(r => [...r]);
 
-function onCriteriaChange() {
-    renderMatrix();
-}
-
 function renderMatrix() {
     const n = currentMatrix.length;
-    let html = '<div class="table-responsive"><table class="table table-sm" style="font-size:0.75rem"><thead><tr><th></th>';
-    CRIT_LABELS.slice(0, n).forEach(l => { html += `<th>${l}</th>`; });
+    let html = '<div class="table-responsive"><table class="table table-sm" style="font-size:0.72rem"><thead><tr><th></th>';
+    CRIT_LABELS.forEach(l => { html += `<th>${l}</th>`; });
     html += '</tr></thead><tbody>';
     for (let i = 0; i < n; i++) {
         html += `<tr><th style="white-space:nowrap;color:var(--muted)">${CRIT_LABELS[i]}</th>`;
@@ -114,7 +124,7 @@ function renderMatrix() {
             const v = currentMatrix[i][j];
             const diag = i === j;
             html += `<td><input type="number"
-                style="width:60px;padding:2px;font-size:0.75rem;background:var(--card2);
+                style="width:55px;padding:2px;font-size:0.72rem;background:var(--card2);
                        color:var(--text);border:1px solid var(--border);border-radius:4px"
                 id="m${i}_${j}" value="${Math.round(v*1000)/1000}"
                 step="any" ${diag ? 'disabled' : ''}
@@ -182,9 +192,8 @@ function renderWeights() {
     const status = cons.consistent ? 'alert-success' : 'alert-warning';
     document.getElementById('consistencyInfo').innerHTML = `
     <div class="alert ${status} mb-0" style="font-size:0.85rem">
-        lambda_max = ${cons.lambda_max} &nbsp;|&nbsp;
+        λmax = ${cons.lambda_max} &nbsp;|&nbsp;
         ИС = ${cons.CI} &nbsp;|&nbsp;
-        RI = ${cons.RI} &nbsp;|&nbsp;
         ОС = ${cons.CR} &nbsp;
         ${cons.consistent ? '— матрица согласована' : '— матрица НЕ согласована'}
     </div>`;
@@ -199,23 +208,19 @@ function showAHPTab(tab) {
 
     if (tab === 'pairwise') {
         html = '<p style="color:var(--muted);font-size:0.8rem">Матрица попарных сравнений критериев (A)</p>';
-        html += buildTable(steps.criteria_labels, steps.criteria_labels,
-                           steps.pairwise_matrix, 4);
+        html += buildTable(steps.criteria_labels, steps.criteria_labels, steps.pairwise_matrix, 4);
         html += `<p style="color:var(--muted);font-size:0.8rem;margin-top:8px">
             Суммы столбцов: ${steps.col_sums.join(' | ')}
         </p>`;
     } else if (tab === 'norm') {
         html = '<p style="color:var(--muted);font-size:0.8rem">Нормализованная матрица (A / col_sum)</p>';
-        html += buildTable(steps.criteria_labels, steps.criteria_labels,
-                           steps.normalized_matrix, 4);
+        html += buildTable(steps.criteria_labels, steps.criteria_labels, steps.normalized_matrix, 4);
         html += '<p style="color:var(--muted);font-size:0.8rem;margin-top:8px">Веса (среднее строк): ';
-        html += steps.weights.map((w,i) =>
-            `${steps.criteria_labels[i]}=${w}`).join(' | ');
+        html += steps.weights.map((w,i) => `${steps.criteria_labels[i]}=${w}`).join(' | ');
         html += '</p>';
     } else if (tab === 'local') {
         html = '<p style="color:var(--muted);font-size:0.8rem">Локальные приоритеты альтернатив по каждому критерию</p>';
-        html += buildTable(steps.criteria_labels, steps.motor_codes,
-                           steps.local_priorities, 4);
+        html += buildTable(steps.criteria_labels, steps.motor_codes, steps.local_priorities, 4);
     } else if (tab === 'ranking') {
         html = '<div class="table-responsive"><table class="table"><thead><tr>';
         html += '<th>Ранг</th><th>Код</th><th>Двигатель</th><th>Zi</th></tr></thead><tbody>';
@@ -256,7 +261,7 @@ function buildTable(colHeaders, rowLabels, matrix, decimals) {
 function goToStep4() {
     if (!ahpData) { alert('Сначала запустите МАИ'); return; }
     localStorage.setItem('ahpData', JSON.stringify(ahpData));
-    const winnerIds = ahpData.ranking.slice(0, 3).map(r => r.id);
+    const winnerIds = ahpData.ranking.slice(0, 5).map(r => r.id);
     localStorage.setItem('finalistIds', JSON.stringify(winnerIds));
     window.location.href = '/step4';
 }
