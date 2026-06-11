@@ -3,7 +3,7 @@ from sklearn.cluster import DBSCAN
 from sklearn.decomposition import PCA
 from sklearn.preprocessing import StandardScaler
 
-# Основные признаки для кластеризации (количественные критерии)
+# Признаки для кластеризации (количественные, хорошо различают альтернативы)
 CLUSTER_FEATURES = [
     "k3_range", "k4_eff", "k5_torque",
     "k8_mass", "k9_price"
@@ -13,12 +13,12 @@ CLUSTER_LABELS = [
     "K8 Масса, кг", "K9 Цена, тыс.руб"
 ]
 
-# Все признаки для PCA
+# Все количественные признаки для PCA (исключены пороговые K14,K15,K17,K24,K26)
 PCA_FEATURES = [
     "k1_power", "k3_range", "k4_eff", "k5_torque",
     "k6_current", "k7_inertia", "k8_mass", "k9_price",
-    "k10_ip", "k12_cooling", "k13_mount",
-    "k16_overload", "k20_insul", "k21_noise", "k22_mtbf",
+    "k10_ip", "k12_cool", "k13_mount",
+    "k16_load", "k20_insul", "k21_noise", "k22_mtbf",
     "k23_maint", "k25_repair",
 ]
 PCA_LABELS = [
@@ -53,7 +53,7 @@ def run_dbscan(motors):
     labels = dbscan.fit_predict(X_scaled).tolist()
 
     pca_2d = PCA(n_components=2)
-    X_pca2 = pca_2d.fit_transform(X_scaled)
+    pca_2d.fit_transform(X_scaled)
 
     X_pca_full = StandardScaler().fit_transform(
         np.array([
@@ -75,6 +75,9 @@ def run_dbscan(motors):
          for i in range(len(PCA_FEATURES))],
         key=lambda x: x["loading"], reverse=True
     )
+
+    # PCA scatter по признакам кластеризации
+    X_pca2 = PCA(n_components=2).fit_transform(X_scaled)
 
     clusters = {}
     for i, lbl in enumerate(labels):
