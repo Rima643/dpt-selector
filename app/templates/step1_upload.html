@@ -193,10 +193,14 @@ function openEdit(id) {
     editMotorId = id;
     const m = allMotors.find(x => x.id === id);
     const fields = [
-        ['k1_power','K1 Мощность, кВт'],['k2_eff','K2 КПД, %'],
-        ['k3_torque','K3 Момент, Нм'],['k4_current','K4 Ток, А'],
-        ['k5_mass','K5 Масса, кг'],['k6_ip','K6 IP'],
-        ['k7_cooling','K7 Охлаждение'],['k10_price','K10 Цена, тыс.руб'],
+        ['k1_power',  'K1 Мощность, кВт'],
+        ['k2_speed',  'K2 Скорость, об/мин'],
+        ['k3_range',  'K3 Диапазон'],
+        ['k4_eff',    'K4 КПД, %'],
+        ['k5_torque', 'K5 Момент, Нм'],
+        ['k6_current','K6 Ток, А'],
+        ['k10_ip',    'K10 Класс IP'],
+        ['k9_price',  'K9 Цена, тыс.руб'],
     ];
     document.getElementById('editModalBody').innerHTML =
         '<div class="row g-2">' +
@@ -211,8 +215,8 @@ function openEdit(id) {
 }
 
 async function saveEdit() {
-    const fields = ['k1_power','k2_eff','k3_torque','k4_current',
-                    'k5_mass','k6_ip','k7_cooling','k10_price'];
+    const fields = ['k1_power','k2_speed','k3_range','k4_eff',
+                    'k5_torque','k6_current','k10_ip','k9_price'];
     const data = {};
     fields.forEach(k => {
         const el = document.getElementById(`edit-${k}`);
